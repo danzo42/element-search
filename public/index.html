@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>コマツ エレメント検索</title>
+  <meta name="description" content="P.ELE 2026 建機エレメント総合カタログ（コマツ）の型式・品番検索">
+  <meta name="theme-color" content="#123a63">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="エレメント検索">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="title-row">
+      <h1>コマツ エレメント検索</h1>
+      <button id="installBtn" class="install" hidden>インストール</button>
+    </div>
+    <div class="modes" role="tablist" aria-label="検索の種類">
+      <button role="tab" id="modeModel" class="mode active" aria-selected="true" data-mode="model">型式・エンジンで探す</button>
+      <button role="tab" id="modePart" class="mode" aria-selected="false" data-mode="part">品番で探す</button>
+    </div>
+    <div class="search">
+      <input id="q" type="search" inputmode="search" autocomplete="off" autocapitalize="characters" spellcheck="false"
+             placeholder="例: PC200 / D31 / SAA6D107">
+      <button id="clear" class="clear" aria-label="入力を消す" hidden>×</button>
+    </div>
+    <div id="cats" class="cats" aria-label="機種区分"></div>
+  </header>
+
+  <div id="iosHint" class="ios-hint" hidden>
+    <span>ホーム画面に追加するには、Safariの共有ボタン（□に↑）→「ホーム画面に追加」をタップ</span>
+    <button id="iosHintClose" aria-label="閉じる">×</button>
+  </div>
+
+  <main>
+    <p id="status" class="status" aria-live="polite"></p>
+    <div id="results"></div>
+    <button id="more" class="more" hidden>さらに表示</button>
+  </main>
+
+  <footer class="foot">
+    <p>出典: P.ELE 2026 建機エレメント総合カタログ「KOMATSU コマツ」P.1〜30（ピーコックエレメント）</p>
+    <p><span class="oem-sample">点線枠</span>は原本で淡色表示の純正品番（カタログ上「検証中」）、<span class="warn-sample">要確認</span>は原本の判読が難しい箇所です。発注前に原本カタログで確認してください。</p>
+    <p id="dataInfo"></p>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

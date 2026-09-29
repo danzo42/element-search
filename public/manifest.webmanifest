@@ -1,0 +1,17 @@
+{
+  "name": "コマツ エレメント検索",
+  "short_name": "エレメント検索",
+  "description": "P.ELE 2026 建機エレメント総合カタログ（コマツ）の型式・品番検索",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#123a63",
+  "theme_color": "#123a63",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
