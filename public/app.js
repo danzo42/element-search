@@ -218,7 +218,7 @@
       return `<section><h2><span class="lbl ${c.key}">${esc(c.label)}</span>${shown.length} 品番</h2><div class="pn-grid">${btns}</div></section>`;
     }).join('');
     resultsEl.innerHTML = `<div class="pn-index">${html}</div>`;
-    statusEl.textContent = '品番をタップすると、その品番を使う型式を表示します（数字は該当行数）。STはCATの「ステアリング」／日立・住友建機の「サクション」／北越工業の「コンプエア」、TMはCATの「TM・パイロット」／日立・住友建機の「ドレン・パイロット」／北越工業の「コンプオイル」です';
+    statusEl.textContent = '品番をタップすると、その品番を使う型式を表示します（数字は該当行数）。STはCATの「ステアリング」／日立・住友建機の「サクション」／北越工業の「コンプエア」、TMはCATの「TM・パイロット」／日立・住友建機の「ドレン・パイロット」／北越工業の「コンプオイル」、川崎重工業のSTは「作動油リターン」です';
     moreEl.hidden = true;
   }
 

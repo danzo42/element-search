@@ -9,5 +9,6 @@
   {"id":"denyo","name":"デンヨー","pages":"P.127-143","cols":["oil","air","fuel","hyd"]},
   {"id":"hokuetsu","name":"北越工業","pages":"P.144-160","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"コンプエア","tm":"コンプオイル"}},
   {"id":"shindaiwa","name":"新ダイワ工業","pages":"P.161-164","cols":["oil","air","fuel","hyd"]},
-  {"id":"nipponsharyo","name":"日本車両","pages":"P.165-170","cols":["oil","air","fuel","hyd"]}
+  {"id":"nipponsharyo","name":"日本車両","pages":"P.165-170","cols":["oil","air","fuel","hyd"]},
+  {"id":"kawasaki","name":"川崎重工業","pages":"P.171-176","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}}
 ]
