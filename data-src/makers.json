@@ -3,5 +3,6 @@
   {"id":"cat","name":"CAT","pages":"P.31-55","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"ステアリング","tm":"TM・P"}},
   {"id":"hitachi","name":"日立","pages":"P.56-75","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"サクション","tm":"ドレン・P"}},
   {"id":"sumitomo","name":"住友建機","pages":"P.76-88","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"サクション","tm":"ドレン・P"}},
-  {"id":"kobelco","name":"コベルコ建機","pages":"P.89-104","cols":["oil","air","fuel","hyd"]}
+  {"id":"kobelco","name":"コベルコ建機","pages":"P.89-104","cols":["oil","air","fuel","hyd"]},
+  {"id":"kubota","name":"クボタ","pages":"P.105-114","cols":["oil","air","fuel","hyd"]}
 ]
