@@ -20,5 +20,6 @@
   {"id":"maeda","name":"前田製作所","pages":"P.217-218","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
   {"id":"hanix","name":"ハニックス工業","pages":"P.219-221","cols":["oil","air","fuel","hyd"]},
   {"id":"ihi","name":"石川島建機","pages":"P.222-230","cols":["oil","air","fuel","hyd"]},
-  {"id":"aichi","name":"アイチ","pages":"P.231-234","cols":["oil","air","fuel","hyd"]}
+  {"id":"aichi","name":"アイチ","pages":"P.231-234","cols":["oil","air","fuel","hyd"]},
+  {"id":"tcm","name":"TCM","pages":"P.236-240","cols":["oil","air","fuel","hyd"]}
 ]
