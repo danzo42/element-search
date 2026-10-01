@@ -5,5 +5,6 @@
   {"id":"sumitomo","name":"住友建機","pages":"P.76-88","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"サクション","tm":"ドレン・P"}},
   {"id":"kobelco","name":"コベルコ建機","pages":"P.89-104","cols":["oil","air","fuel","hyd"]},
   {"id":"kubota","name":"クボタ","pages":"P.105-114","cols":["oil","air","fuel","hyd"]},
-  {"id":"yanmar","name":"ヤンマー","pages":"P.115-126","cols":["oil","air","fuel","hyd"]}
+  {"id":"yanmar","name":"ヤンマー","pages":"P.115-126","cols":["oil","air","fuel","hyd"]},
+  {"id":"denyo","name":"デンヨー","pages":"P.127-143","cols":["oil","air","fuel","hyd"]}
 ]
