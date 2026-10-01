@@ -6,5 +6,6 @@
   {"id":"kobelco","name":"コベルコ建機","pages":"P.89-104","cols":["oil","air","fuel","hyd"]},
   {"id":"kubota","name":"クボタ","pages":"P.105-114","cols":["oil","air","fuel","hyd"]},
   {"id":"yanmar","name":"ヤンマー","pages":"P.115-126","cols":["oil","air","fuel","hyd"]},
-  {"id":"denyo","name":"デンヨー","pages":"P.127-143","cols":["oil","air","fuel","hyd"]}
+  {"id":"denyo","name":"デンヨー","pages":"P.127-143","cols":["oil","air","fuel","hyd"]},
+  {"id":"hokuetsu","name":"北越工業","pages":"P.144-160","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"コンプエア","tm":"コンプオイル"}}
 ]
