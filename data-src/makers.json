@@ -1,5 +1,5 @@
 [
   {"id":"komatsu","name":"コマツ","pages":"P.1-30","cols":["oil","air","fuel","hyd"]},
   {"id":"cat","name":"CAT","pages":"P.31-55","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"ステアリング","tm":"TM・P"}},
-  {"id":"hitachi","name":"日立","pages":"P.56-","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"サクション","tm":"ドレン・P"}}
+  {"id":"hitachi","name":"日立","pages":"P.56-75","cols":["oil","air","fuel","hyd","st","tm"],"labels":{"st":"サクション","tm":"ドレン・P"}}
 ]
