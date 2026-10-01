@@ -14,5 +14,6 @@
   {"id":"sakai","name":"酒井重工業","pages":"P.177-184","cols":["oil","air","fuel","hyd"]},
   {"id":"hanta","name":"範多機械","pages":"P.185-187","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
   {"id":"furukawa","name":"古河機械","pages":"P.188-195","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
-  {"id":"morooka","name":"諸岡","pages":"P.196-200","cols":["oil","air","fuel","hyd"]}
+  {"id":"morooka","name":"諸岡","pages":"P.196-200","cols":["oil","air","fuel","hyd"]},
+  {"id":"tadano","name":"タダノ","pages":"P.201-208","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}}
 ]

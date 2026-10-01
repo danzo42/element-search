@@ -1,5 +1,5 @@
 // データを更新したら VERSION を上げる（端末側のキャッシュが入れ替わる）
-const VERSION = 'peacock-ele-v19';
+const VERSION = 'peacock-ele-v20';
 const ASSETS = [
   './',
   'index.html',
