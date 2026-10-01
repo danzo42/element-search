@@ -16,5 +16,7 @@
   {"id":"furukawa","name":"古河機械","pages":"P.188-195","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
   {"id":"morooka","name":"諸岡","pages":"P.196-200","cols":["oil","air","fuel","hyd"]},
   {"id":"tadano","name":"タダノ","pages":"P.201-208","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
-  {"id":"kato","name":"加藤製作所","pages":"P.209-216","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}}
+  {"id":"kato","name":"加藤製作所","pages":"P.209-216","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
+  {"id":"maeda","name":"前田製作所","pages":"P.217-218","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
+  {"id":"hanix","name":"ハニックス工業","pages":"P.219-221","cols":["oil","air","fuel","hyd"]}
 ]
