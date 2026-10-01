@@ -18,5 +18,6 @@
   {"id":"tadano","name":"タダノ","pages":"P.201-208","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
   {"id":"kato","name":"加藤製作所","pages":"P.209-216","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
   {"id":"maeda","name":"前田製作所","pages":"P.217-218","cols":["oil","air","fuel","hyd","st"],"labels":{"st":"作動油リターン"}},
-  {"id":"hanix","name":"ハニックス工業","pages":"P.219-221","cols":["oil","air","fuel","hyd"]}
+  {"id":"hanix","name":"ハニックス工業","pages":"P.219-221","cols":["oil","air","fuel","hyd"]},
+  {"id":"ihi","name":"石川島建機","pages":"P.222-230","cols":["oil","air","fuel","hyd"]}
 ]
