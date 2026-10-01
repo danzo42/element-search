@@ -1,5 +1,5 @@
 // データを更新したら VERSION を上げる（端末側のキャッシュが入れ替わる）
-const VERSION = 'komatsu-ele-v1';
+const VERSION = 'peacock-ele-v2';
 const ASSETS = [
   './',
   'index.html',

@@ -17,6 +17,12 @@
   --air: #0e7490;
   --fuel: #15803d;
   --hyd: #7c3aed;
+  --st: #be185d;
+  --tm: #475569;
+  --unv: #b45309;
+  --unv-bg: #fff7e6;
+  --unk: #b91c1c;
+  --unk-bg: #fee2e2;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -36,6 +42,12 @@
     --air: #22d3ee;
     --fuel: #4ade80;
     --hyd: #a78bfa;
+    --st: #f472b6;
+    --tm: #94a3b8;
+    --unv: #fbbf24;
+    --unv-bg: #2e2410;
+    --unk: #fca5a5;
+    --unk-bg: #3b1d1d;
   }
 }
 
@@ -111,10 +123,10 @@ main { padding: 8px 16px 24px; max-width: 760px; margin: 0 auto; }
 .meta { font-size: 13px; color: var(--muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
 .meta b { color: var(--text); font-weight: 600; }
 .elems { margin-top: 8px; display: grid; gap: 4px; }
-.elem { display: grid; grid-template-columns: 58px 1fr; align-items: start; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--line); }
+.elem { display: grid; grid-template-columns: 82px 1fr; align-items: start; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--line); }
 .elem:first-child { border-top: 0; }
 .lbl { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 3px 0; text-align: center; color: #fff; }
-.lbl.oil { background: var(--oil); } .lbl.air { background: var(--air); } .lbl.fuel { background: var(--fuel); } .lbl.hyd { background: var(--hyd); }
+.lbl.oil { background: var(--oil); } .lbl.air { background: var(--air); } .lbl.fuel { background: var(--fuel); } .lbl.hyd { background: var(--hyd); } .lbl.st { background: var(--st); } .lbl.tm { background: var(--tm); }
 @media (prefers-color-scheme: dark) { .lbl { color: #0e141b; } }
 .val { font-size: 16px; word-break: break-all; }
 .val.none { color: var(--muted); font-size: 13px; }
@@ -133,7 +145,7 @@ main { padding: 8px 16px 24px; max-width: 760px; margin: 0 auto; }
 .note.warn::before { content: "要確認 "; font-weight: 800; }
 
 .pn-index h2 { font-size: 15px; margin: 14px 2px 6px; display: flex; align-items: center; gap: 8px; }
-.pn-index .lbl { display: inline-block; width: 58px; }
+.pn-index .lbl { display: inline-block; min-width: 58px; padding: 3px 8px; }
 .pn-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .pn-grid .pn { font-size: 15px; padding: 5px 8px; }
 .pn-grid .pn small { font-weight: 400; color: var(--muted); margin-left: 3px; font-size: 11px; }
@@ -146,3 +158,29 @@ main { padding: 8px 16px 24px; max-width: 760px; margin: 0 auto; }
 .oem-sample { border: 1px dashed var(--oem); border-radius: 4px; padding: 0 4px; }
 .warn-sample { background: var(--warn-bg); color: var(--warn-ink); border-radius: 4px; padding: 0 4px; font-weight: 700; }
 mark { background: var(--hit); color: inherit; border-radius: 3px; }
+
+/* メーカー切り替え */
+.makers { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px 2px; scrollbar-width: none; }
+.makers::-webkit-scrollbar { display: none; }
+.maker {
+  flex: 0 0 auto; border: 1px solid rgba(255,255,255,.4); background: rgba(255,255,255,.08); color: #fff;
+  border-radius: 10px; padding: 6px 14px; font-size: 15px; font-weight: 700; white-space: nowrap;
+}
+.maker small { opacity: .75; margin-left: 5px; font-weight: 400; font-size: 12px; }
+.maker.active { background: #fff; color: var(--brand); border-color: #fff; }
+@media (prefers-color-scheme: dark) { .maker.active { background: #d6e6f7; color: #0d2c4c; } }
+
+/* 注意書き */
+.caution {
+  margin: 8px 0 4px; padding: 8px 10px; border-radius: 8px; font-size: 13px;
+  background: var(--warn-bg); color: var(--warn-ink);
+}
+
+/* 未確認の行／読み取れなかった箇所 */
+.card.is-unverified { border-left: 5px solid var(--unv); background: linear-gradient(90deg, var(--unv-bg), var(--surface) 28%); }
+.card.is-checked { border-left: 5px solid var(--fuel); }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 7px; }
+.tag.unv { background: var(--unv-bg); color: var(--unv); border: 1px solid var(--unv); }
+.tag.unk-tag { background: var(--unk-bg); color: var(--unk); border: 1px solid var(--unk); }
+.unk { background: var(--unk-bg); color: var(--unk); border: 1px solid var(--unk); border-radius: 5px; padding: 0 5px; font-weight: 800; margin: 0 1px; }
+.page .mk { font-weight: 700; color: var(--text); margin-right: 2px; }

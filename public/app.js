@@ -2,19 +2,24 @@
   'use strict';
 
   const DATA = window.ELEMENT_DATA;
-  const COLS = [
-    { key: 'oil', label: 'オイル', idx: 5 },
-    { key: 'air', label: 'エア', idx: 6 },
-    { key: 'fuel', label: '燃料', idx: 7 },
-    { key: 'hyd', label: '作動油', idx: 8 },
+  const MAKERS = DATA.makers;
+  const MAKER_BY_ID = Object.fromEntries(MAKERS.map((m) => [m.id, m]));
+  // 列の定義。idx は DATA.rows の位置（0 メーカー,1 ページ,2 区分,3 型式,4 エンジン,5 シリアル,6 オイル,7 エア,8 燃料,9 作動油,10 ST,11 TM,12 備考,13 〃列,14 status）
+  const ALL_COLS = [
+    { key: 'oil', label: 'オイル', idx: 6 },
+    { key: 'air', label: 'エア', idx: 7 },
+    { key: 'fuel', label: '燃料', idx: 8 },
+    { key: 'hyd', label: '作動油', idx: 9 },
+    { key: 'st', label: 'ST', idx: 10 },
+    { key: 'tm', label: 'TM', idx: 11 },
   ];
   const PAGE_SIZE = 60;
+  const UNKNOWN = '???';
 
   const $ = (id) => document.getElementById(id);
-  const qEl = $('q'), resultsEl = $('results'), statusEl = $('status'), moreEl = $('more'), catsEl = $('cats');
+  const qEl = $('q'), resultsEl = $('results'), statusEl = $('status'), moreEl = $('more'), catsEl = $('cats'), makersEl = $('makers');
 
   // ---------- 正規化 ----------
-  // 全角英数・記号を半角にし、大文字化する
   function toHalf(s) {
     return String(s)
       .replace(/[！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
@@ -26,94 +31,111 @@
   const normPart = (s) => toHalf(s).replace(/[^0-9A-Z]/g, '');
 
   // ---------- 品番の切り出し ----------
-  // 「150KC=527K」のように区分記号(C=, T= など)が品番に続く箇所へ空白を入れる
   const LABEL_SPLIT = /([0-9A-Z)])(HST|CV|TM|WS|C|S|T|H|P|M|R)=/g;
-  // 「195NS,T=」「527KT,S=」のように S,T= / T,S= が品番に続く箇所
   const PAIR_SPLIT = /([0-9][0-9A-Z]*[0-9A-Z])([ST])([,、])([ST])=/g;
   const PART_RE = /[0-9A-Z][0-9A-Z.\-]*(?:\([A-Z]\))?/g;
   // 純正品番（原本では淡色表示・検証中）の形
-  const OEM_RE = /^(?:YM\d|HD\d|\d{2,4}[A-Z]?-\d{2}-\d{4,5}|\d{3}-\d{3}-\d{4}|[0-9A-Z]{3}-\d{2}-\d{5}|\d{6}-\d{5}|\d{10}$)/;
+  const OEM_RE = /^(?:YM\d|HD\d|\d{2,4}[A-Z]?-\d{2}-\d{4,5}|\d{3}-\d{3}-\d{4}|[0-9A-Z]{3}-\d{2}-\d{5}|\d{6}-\d{5}|\d{7}|\d{9,10}$)/;
 
-  // セル文字列を [{text, key, search}] の断片に分ける。key があれば品番として検索できる
+  // セル文字列を [{text, key, search, oem, unknown}] の断片に分ける
   function splitCell(cell) {
-    const s = String(cell || '').replace(PAIR_SPLIT, '$1 $2$3$4=').replace(LABEL_SPLIT, '$1 $2=');
+    const raw0 = String(cell || '');
+    const s = raw0.replace(PAIR_SPLIT, '$1 $2$3$4=').replace(LABEL_SPLIT, '$1 $2=');
     const out = [];
     let last = 0, m;
     PART_RE.lastIndex = 0;
+    // ??? はそのまま「読めなかった箇所」として表示する（品番としては扱わない）
+    const unknownSpans = [];
+    for (let at = s.indexOf(UNKNOWN); at >= 0; at = s.indexOf(UNKNOWN, at + 3)) unknownSpans.push(at);
+    const isUnknownAt = (i) => unknownSpans.some((u) => i >= u && i < u + 3);
     while ((m = PART_RE.exec(s))) {
       const raw = m[0];
+      if (isUnknownAt(m.index)) continue;
       const before = s[m.index - 1] || '';
       const after = s[m.index + raw.length] || '';
       const tok = raw.replace(/[.\-]+$/, '');
       const isPart =
         /\d/.test(tok) &&
-        !/[#~×xX]/.test(before) &&   // シリアル・数量（#1001~, ×2）
-        !/[~=…?]/.test(after) &&     // 範囲・区分ラベル（D80=）・欠け・判読不確実
+        !/[#~×xX]/.test(before) &&
+        !/[~=…?]/.test(after) &&
         !/[぀-ヿ]/.test(after) &&
-        !/^[GW]\d{3}$/.test(tok) &&  // メッシュ・ゲージ表記（W058, G135）
+        !/^[GW]\d{3}$/.test(tok) &&
         tok.length >= 2;
       if (!isPart) continue;
       if (m.index > last) out.push({ text: s.slice(last, m.index) });
-      // 「836P(W)」は 836P と 836PW のどちらの検索でも見つかるようにする
       const opt = tok.match(/^(.*)\(([A-Z])\)$/);
       const search = opt ? [opt[1], opt[1] + opt[2]] : [tok];
       out.push({ text: tok, key: tok, search, oem: OEM_RE.test(search[0]) });
       last = m.index + tok.length;
     }
     if (last < s.length) out.push({ text: s.slice(last) });
-    return out;
+    // ??? を強調表示用の断片に分け直す
+    return out.flatMap((f) => {
+      if (f.key || !f.text.includes(UNKNOWN)) return [f];
+      return f.text.split(UNKNOWN).flatMap((t, i, arr) => {
+        const parts = [];
+        if (t) parts.push({ text: t });
+        if (i < arr.length - 1) parts.push({ text: UNKNOWN, unknown: true });
+        return parts;
+      });
+    });
   }
 
   // ---------- 行データの準備 ----------
   function aliasModel(model) {
-    // 「D20·21A-7」→「D21A-7」のように・で並記された型式の別表記を作る
     const alias = model.replace(/([A-Z]+)(\d+)·(\d+)/g, '$1$3');
     const noParen = model.replace(/\([^)]*\)/g, '');
     return [model, alias, noParen].map(normModel).join('|');
   }
 
   const rows = DATA.rows.map((r, i) => {
-    const cells = COLS.map((c) => splitCell(r[c.idx]));
-    const keys = cells.map((frags) => frags.filter((f) => f.key).map((f) => f.key));
+    const mk = MAKER_BY_ID[r[0]];
+    const cols = ALL_COLS.filter((c) => mk.cols.includes(c.key)).map((c) => ({
+      ...c, label: (mk.labels && mk.labels[c.key]) || c.label,
+    }));
+    const cells = cols.map((c) => splitCell(r[c.idx]));
+    const unknownCount = cols.reduce((n, c) => n + (String(r[c.idx]).includes(UNKNOWN) ? 1 : 0), 0);
     return {
-      i, page: r[0], cat: r[1], model: r[2], engine: r[3], serial: r[4],
-      raw: COLS.map((c) => r[c.idx]), note: r[9], ditto: r[10] || '',
-      cells, keys,
-      modelKey: aliasModel(r[2]) + '|' + normModel(r[3]),
+      i, maker: r[0], makerName: mk.name, page: r[1], cat: r[2], model: r[3], engine: r[4], serial: r[5],
+      note: r[12], ditto: r[13] || '', status: r[14], unknownCount,
+      cols, cells,
+      modelKey: aliasModel(r[3]) + '|' + normModel(r[4]),
       partKeys: cells.flat().filter((f) => f.key).flatMap((f) => f.search).map(normPart),
     };
   });
 
   // 品番 → 件数（品番一覧用）
-  const partIndex = COLS.map(() => new Map());
-  rows.forEach((row) => row.keys.forEach((ks, ci) => {
-    new Set(ks).forEach((k) => {
-      const cur = partIndex[ci].get(k) || { count: 0, oem: OEM_RE.test(k) };
-      cur.count++; partIndex[ci].set(k, cur);
+  const partIndex = new Map(ALL_COLS.map((c) => [c.key, new Map()]));
+  rows.forEach((row) => row.cols.forEach((c, ci) => {
+    const map = partIndex.get(c.key);
+    new Set(row.cells[ci].filter((f) => f.key).map((f) => f.key)).forEach((k) => {
+      const cur = map.get(k) || { count: 0, oem: OEM_RE.test(k) };
+      cur.count++; map.set(k, cur);
     });
   }));
 
-  const catCounts = new Map();
-  rows.forEach((r) => catCounts.set(r.cat, (catCounts.get(r.cat) || 0) + 1));
+  const makerCounts = new Map();
+  rows.forEach((r) => makerCounts.set(r.maker, (makerCounts.get(r.maker) || 0) + 1));
 
   // ---------- 状態 ----------
-  const state = { mode: 'model', q: '', cat: '', shown: PAGE_SIZE };
+  const state = { mode: 'model', q: '', maker: '', cat: '', shown: PAGE_SIZE };
   try {
     const saved = JSON.parse(localStorage.getItem('ele-state') || '{}');
     if (saved.mode === 'part' || saved.mode === 'model') state.mode = saved.mode;
+    if (saved.maker !== undefined && (saved.maker === '' || MAKER_BY_ID[saved.maker])) state.maker = saved.maker;
   } catch (e) { /* 保存できない環境でも動く */ }
-
   function saveState() {
-    try { localStorage.setItem('ele-state', JSON.stringify({ mode: state.mode })); } catch (e) { /* noop */ }
+    try { localStorage.setItem('ele-state', JSON.stringify({ mode: state.mode, maker: state.maker })); } catch (e) { /* noop */ }
   }
+
+  const baseRows = () => rows.filter((r) => (!state.maker || r.maker === state.maker) && (!state.cat || r.cat === state.cat));
 
   // ---------- 検索 ----------
   function search() {
-    const cat = state.cat;
-    const base = cat ? rows.filter((r) => r.cat === cat) : rows;
+    const base = baseRows();
     if (state.mode === 'model') {
       const q = normModel(state.q);
-      if (!q) return cat ? base : null;
+      if (!q) return (state.cat || state.maker) ? base : null;
       return base.filter((r) => r.modelKey.includes(q));
     }
     const q = normPart(state.q);
@@ -131,7 +153,6 @@
 
   function highlight(text, q) {
     if (!q) return esc(text);
-    // 型式の一致箇所を、記号を無視して強調する
     const chars = [...text];
     const map = [];
     let norm = '';
@@ -148,6 +169,7 @@
   function renderCell(frags, qPart) {
     if (!frags.length || frags.every((f) => !f.text.trim())) return '<span class="val none">記載なし</span>';
     return '<span class="val">' + frags.map((f) => {
+      if (f.unknown) return '<span class="unk" title="原本で読み取れなかった箇所">???</span>';
       if (!f.key) return esc(f.text);
       const hit = qPart && f.search.map(normPart).some((nk) => nk === qPart || nk.startsWith(qPart));
       const cls = 'pn' + (f.oem ? ' oem' : '') + (hit ? ' hit' : '');
@@ -163,44 +185,52 @@
     if (r.engine) meta.push(`エンジン <b>${esc(r.engine)}</b>`);
     if (r.serial) meta.push(`シリアル <b>${esc(r.serial)}</b>`);
     meta.push(esc(r.cat));
-    const elems = COLS.map((c, ci) => {
-      const ditto = r.ditto.includes(String(ci)) ? '<span class="ditto">（原本「〃」）</span>' : '';
-      return `<div class="elem"><span class="lbl ${c.key}">${c.label}</span><div>${renderCell(r.cells[ci], qPart)}${ditto}</div></div>`;
+    const elems = r.cols.map((c, ci) => {
+      const ditto = ci < 4 && r.ditto.includes(String(ci)) ? '<span class="ditto">（原本「〃」）</span>' : '';
+      return `<div class="elem"><span class="lbl ${c.key}">${esc(c.label)}</span><div>${renderCell(r.cells[ci], qPart)}${ditto}</div></div>`;
     }).join('');
+    const flags = [];
+    if (r.status !== 'checked') flags.push('<span class="tag unv" title="2回読みによる確認が済んでいない行です">未確認</span>');
+    if (r.unknownCount) flags.push(`<span class="tag unk-tag" title="原本で読み取れなかった箇所があります">読取不可 ${r.unknownCount}</span>`);
     let note = '';
     if (r.note) {
       const warn = /確認|判読|欠け|不確実|検証中/.test(r.note);
       note = `<div class="note${warn ? ' warn' : ''}">${esc(r.note)}</div>`;
     }
-    return `<article class="card">
-      <div class="card-head"><div class="model">${highlight(r.model, qModel)}</div><div class="page">カタログ P.${r.page}</div></div>
-      <div class="meta">${meta.map((m) => `<span>${m}</span>`).join('')}</div>
+    return `<article class="card ${r.status === 'checked' ? 'is-checked' : 'is-unverified'} mk-${r.maker}">
+      <div class="card-head"><div class="model">${highlight(r.model, qModel)}</div><div class="page"><span class="mk">${esc(r.makerName)}</span> P.${r.page}</div></div>
+      <div class="meta">${meta.map((m) => `<span>${m}</span>`).join('')}${flags.join('')}</div>
       <div class="elems">${elems}</div>${note}
     </article>`;
   }
 
   function renderPartIndex() {
-    const html = COLS.map((c, ci) => {
-      const list = [...partIndex[ci].entries()]
-        .filter(([, v]) => !v.oem)
+    const html = ALL_COLS.map((c) => {
+      const list = [...partIndex.get(c.key).entries()]
+        .filter(([k, v]) => !v.oem)
         .sort((a, b) => a[0].localeCompare(b[0], 'ja', { numeric: true }));
-      const btns = list.map(([k, v]) => `<button class="pn" data-pn="${esc(k)}">${esc(k)}<small>${v.count}</small></button>`).join('');
-      return `<section><h2><span class="lbl ${c.key}">${c.label}</span>${list.length} 品番</h2><div class="pn-grid">${btns}</div></section>`;
+      // メーカー絞り込み時は、そのメーカーに存在する品番だけを出す
+      const shown = state.maker
+        ? list.filter(([k]) => rows.some((r) => r.maker === state.maker && r.partKeys.includes(normPart(k))))
+        : list;
+      if (!shown.length) return '';
+      const btns = shown.map(([k, v]) => `<button class="pn" data-pn="${esc(k)}">${esc(k)}<small>${v.count}</small></button>`).join('');
+      return `<section><h2><span class="lbl ${c.key}">${esc(c.label)}</span>${shown.length} 品番</h2><div class="pn-grid">${btns}</div></section>`;
     }).join('');
     resultsEl.innerHTML = `<div class="pn-index">${html}</div>`;
-    statusEl.textContent = '品番をタップすると、その品番を使う型式を表示します（数字は該当行数）';
+    statusEl.textContent = '品番をタップすると、その品番を使う型式を表示します（数字は該当行数）。STはCATの「ステアリング」／日立の「サクション」、TMはCATの「TM・パイロット」／日立の「ドレン・パイロット」です';
     moreEl.hidden = true;
   }
 
   function renderHome() {
+    const base = baseRows();
     resultsEl.innerHTML = `<div class="empty">
-      型式（例: <b>PC200</b>、<b>D31</b>、<b>WA100</b>）やエンジン型式を入力するか、<br>上の機種区分をタップしてください。<br><br>
-      全 ${rows.length.toLocaleString()} 行 / ${catCounts.size} 区分</div>`;
+      型式（例: <b>PC200</b>、<b>D31</b>、<b>320</b>、<b>EX200</b>）やエンジン型式を入力するか、<br>上のメーカー・機種区分をタップしてください。<br><br>
+      ${state.maker ? esc(MAKER_BY_ID[state.maker].name) + '：' : '全メーカー：'}${base.length.toLocaleString()} 行</div>`;
     statusEl.textContent = '';
     moreEl.hidden = true;
   }
 
-  let lastList = [];
   function render(resetPaging = true) {
     if (resetPaging) state.shown = PAGE_SIZE;
     const list = search();
@@ -208,9 +238,8 @@
       if (state.mode === 'part') renderPartIndex(); else renderHome();
       return;
     }
-    lastList = list;
     if (!list.length) {
-      resultsEl.innerHTML = '<div class="empty">該当するデータがありません。<br>入力を短くするか、もう一方の検索方法を試してください。</div>';
+      resultsEl.innerHTML = '<div class="empty">該当するデータがありません。<br>入力を短くするか、もう一方の検索方法・別のメーカーを試してください。</div>';
       statusEl.textContent = '0 件';
       moreEl.hidden = true;
       return;
@@ -218,13 +247,24 @@
     const slice = list.slice(0, state.shown);
     resultsEl.innerHTML = slice.map(renderRow).join('');
     const label = state.mode === 'part' ? `品番「${toHalf(state.q)}」を含む型式` : '該当';
-    statusEl.textContent = `${label} ${list.length} 件${state.cat ? `（${state.cat}）` : ''}`;
+    const scope = [state.maker ? MAKER_BY_ID[state.maker].name : '', state.cat].filter(Boolean).join(' / ');
+    statusEl.textContent = `${label} ${list.length} 件${scope ? `（${scope}）` : ''}`;
     moreEl.hidden = list.length <= state.shown;
     moreEl.textContent = `さらに表示（残り ${list.length - state.shown} 件）`;
   }
 
+  function renderMakers() {
+    const items = [['', 'すべて', rows.length], ...MAKERS.map((m) => [m.id, m.name, makerCounts.get(m.id) || 0])];
+    makersEl.innerHTML = items.map(([id, name, n]) =>
+      `<button class="maker${state.maker === id ? ' active' : ''}" data-maker="${esc(id)}">${esc(name)}<small>${n.toLocaleString()}</small></button>`).join('');
+  }
+
   function renderCats() {
-    const cats = [['', 'すべて', rows.length], ...[...catCounts.entries()].map(([k, v]) => [k, k, v])];
+    const counts = new Map();
+    rows.filter((r) => !state.maker || r.maker === state.maker).forEach((r) => counts.set(r.cat, (counts.get(r.cat) || 0) + 1));
+    if (state.cat && !counts.has(state.cat)) state.cat = '';
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    const cats = [['', 'すべて', total], ...[...counts.entries()].map(([k, v]) => [k, k, v])];
     catsEl.innerHTML = cats.map(([k, label, n]) =>
       `<button class="cat${state.cat === k ? ' active' : ''}" data-cat="${esc(k)}">${esc(label)}<small>${n}</small></button>`).join('');
   }
@@ -235,7 +275,7 @@
       const on = b.dataset.mode === mode;
       b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
     });
-    qEl.placeholder = mode === 'model' ? '例: PC200 / D31 / SAA6D107' : '例: 207N-6 / 150K / 3750KF';
+    qEl.placeholder = mode === 'model' ? '例: PC200 / 320 / EX200 / SAA6D107' : '例: 207N-6 / 150K / 3750KF';
     saveState();
   }
 
@@ -253,6 +293,10 @@
     if (state.mode === b.dataset.mode) return;
     setMode(b.dataset.mode); qEl.value = ''; state.q = ''; $('clear').hidden = true; render();
   }));
+  makersEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.maker'); if (!b) return;
+    state.maker = b.dataset.maker; state.cat = ''; saveState(); renderMakers(); renderCats(); render();
+  });
   catsEl.addEventListener('click', (e) => {
     const b = e.target.closest('.cat'); if (!b) return;
     state.cat = b.dataset.cat; renderCats(); render();
@@ -290,7 +334,6 @@
   });
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    // 既に旧版が動いていた場合だけ、新版に切り替わった時点で読み直す（初回インストール時は読み直さない）
     const hadController = !!navigator.serviceWorker.controller;
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -300,8 +343,10 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
-  $('dataInfo').textContent = `データ: ${rows.length.toLocaleString()} 行（${DATA.source}／作成 ${DATA.built}）`;
+  const checkedN = rows.filter((r) => r.status === 'checked').length;
+  $('dataInfo').textContent = `データ: ${rows.length.toLocaleString()} 行（確認済み ${checkedN.toLocaleString()} 行／未確認 ${(rows.length - checkedN).toLocaleString()} 行）・作成 ${DATA.built}`;
   setMode(state.mode);
+  renderMakers();
   renderCats();
   render();
 })();

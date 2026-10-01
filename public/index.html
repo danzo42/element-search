@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>コマツ エレメント検索</title>
-  <meta name="description" content="P.ELE 2026 建機エレメント総合カタログ（コマツ）の型式・品番検索">
+  <title>ピーコックエレメント検索</title>
+  <meta name="description" content="P.ELE 2026 建機エレメント総合カタログ（コマツ・CAT・日立）の型式・品番検索">
   <meta name="theme-color" content="#123a63">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -18,16 +18,17 @@
 <body>
   <header class="top">
     <div class="title-row">
-      <h1>コマツ エレメント検索</h1>
+      <h1>ピーコックエレメント検索</h1>
       <button id="installBtn" class="install" hidden>インストール</button>
     </div>
+    <div id="makers" class="makers" aria-label="メーカー"></div>
     <div class="modes" role="tablist" aria-label="検索の種類">
       <button role="tab" id="modeModel" class="mode active" aria-selected="true" data-mode="model">型式・エンジンで探す</button>
       <button role="tab" id="modePart" class="mode" aria-selected="false" data-mode="part">品番で探す</button>
     </div>
     <div class="search">
       <input id="q" type="search" inputmode="search" autocomplete="off" autocapitalize="characters" spellcheck="false"
-             placeholder="例: PC200 / D31 / SAA6D107">
+             placeholder="例: PC200 / 320 / EX200 / SAA6D107">
       <button id="clear" class="clear" aria-label="入力を消す" hidden>×</button>
     </div>
     <div id="cats" class="cats" aria-label="機種区分"></div>
@@ -39,14 +40,15 @@
   </div>
 
   <main>
+    <p class="caution">品番・OEMコードはカタログ上で確認中の項目を含みます。発注前に原本カタログでご確認ください。</p>
     <p id="status" class="status" aria-live="polite"></p>
     <div id="results"></div>
     <button id="more" class="more" hidden>さらに表示</button>
   </main>
 
   <footer class="foot">
-    <p>出典: P.ELE 2026 建機エレメント総合カタログ「KOMATSU コマツ」P.1〜30（ピーコックエレメント）</p>
-    <p><span class="oem-sample">点線枠</span>は原本で淡色表示の純正品番（カタログ上「検証中」）、<span class="warn-sample">要確認</span>は原本の判読が難しい箇所です。発注前に原本カタログで確認してください。</p>
+    <p>出典: P.ELE 2026 建機エレメント総合カタログ（ピーコックエレメント）／コマツ P.1-30、CAT P.31-55、日立 P.56-（読み取りが済んだ範囲を順次追加中）</p>
+    <p><span class="tag unv">未確認</span>は読み取りの2回確認が済んでいない行、<span class="tag unk-tag">読取不可</span>と<span class="unk">???</span>は原本で読み取れなかった箇所、<span class="oem-sample">点線枠</span>は原本で淡色表示の純正品番（カタログ上「検証中」）、<span class="warn-sample">要確認</span>は原本の判読が難しい箇所です。</p>
     <p id="dataInfo"></p>
   </footer>
 
