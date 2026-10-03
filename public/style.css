@@ -184,3 +184,30 @@ mark { background: var(--hit); color: inherit; border-radius: 3px; }
 .tag.unk-tag { background: var(--unk-bg); color: var(--unk); border: 1px solid var(--unk); }
 .unk { background: var(--unk-bg); color: var(--unk); border: 1px solid var(--unk); border-radius: 5px; padding: 0 5px; font-weight: 800; margin: 0 1px; }
 .page .mk { font-weight: 700; color: var(--text); margin-right: 2px; }
+/* ---------- 銘板カメラ検索 ---------- */
+.cam {
+  position: absolute; right: 44px; top: 50%; transform: translateY(-50%);
+  width: 34px; height: 34px; border-radius: 50%; border: 0;
+  background: #e3e8ee; color: #333; font-size: 17px; line-height: 1;
+}
+#q { padding-right: 84px; }
+.cam-panel {
+  background: var(--surface); border: 2px solid var(--brand); border-radius: 12px;
+  padding: 10px 12px 12px; margin: 8px 0 14px;
+}
+.cam-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cam-x { border: 1px solid var(--line); background: var(--chip); color: var(--chip-ink); border-radius: 8px; padding: 6px 12px; font-weight: 700; }
+.cam-thumb { display: block; max-width: 100%; max-height: 180px; margin: 8px auto; border-radius: 8px; border: 1px solid var(--line); }
+.cam-status { color: var(--muted); font-size: 13px; margin: 6px 0; min-height: 1.4em; }
+.cam-edit { display: flex; gap: 8px; margin: 6px 0; }
+.cam-edit input { flex: 1; min-width: 0; font-size: 18px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); text-transform: uppercase; }
+.cam-edit button { border: 0; background: var(--brand); color: var(--brand-ink); border-radius: 8px; padding: 0 14px; font-weight: 700; white-space: nowrap; }
+.cam-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+.cam-chips-l { font-size: 12px; color: var(--muted); width: 100%; }
+.chip-tok { border: 1px solid var(--line); background: var(--chip); color: var(--chip-ink); border-radius: 999px; padding: 5px 10px; font-weight: 700; }
+.cam-brand { font-size: 13px; margin: 6px 0; }
+.cam-count { font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+.cam-score { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; margin: 8px 0 2px; }
+.cam-bm { background: var(--hit); color: var(--text); border-radius: 6px; padding: 1px 7px; font-weight: 700; }
+.cam-from { color: var(--muted); }
+.cam-note { font-size: 12px; color: var(--muted); margin: 10px 0 0; }

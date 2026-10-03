@@ -343,6 +343,12 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
+  // カメラ検索（camera.js）から使う入口
+  window.PeacockApp = {
+    rows, renderRow, esc, normModel, MAKER_BY_ID,
+    searchByText(text) { setMode('model'); qEl.value = text; state.q = text; $('clear').hidden = !text; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+  };
+
   const checkedN = rows.filter((r) => r.status === 'checked').length;
   $('dataInfo').textContent = `データ: ${rows.length.toLocaleString()} 行（確認済み ${checkedN.toLocaleString()} 行／未確認 ${(rows.length - checkedN).toLocaleString()} 行）・作成 ${DATA.built}`;
   setMode(state.mode);
