@@ -56,26 +56,8 @@
   }
 
   // ---------- カタログの型式キー（「PC200-8,-10」「FL140,160」のような併記を展開） ----------
-  function expandModel(model) {
-    const s = String(model).replace(/\s+/g, '');
-    const parts = s.split(/[,、・/]/).filter(Boolean);
-    const out = new Set();
-    const add = (p) => {
-      const m = p.match(/^(.*?)\(([^)]*)\)(.*)$/);   // 括弧は「付けた形」「外した形」の両方
-      if (m) { add(m[1] + m[3]); add(m[1] + m[2] + m[3]); } else out.add(App.normModel(p));
-    };
-    const first = parts[0] || '';
-    add(first);
-    const lastDash = first.lastIndexOf('-');
-    const base = lastDash > 0 ? first.slice(0, lastDash) : first.replace(/\d+[A-Z]*(?:\([^)]*\))?$/i, '');
-    const stem = first.replace(/\d+[A-Z]*(?:\([^)]*\))?$/i, '');
-    parts.slice(1).forEach((p) => {
-      if (/^-/.test(p)) add(base + p);
-      else if (/^\d/.test(p)) add(stem + p);
-      else add(p);
-    });
-    return [...out].filter((k) => k.length >= 3);
-  }
+  // 通常検索と同じ展開（app.js）を使う
+  const expandModel = (model) => App.expandModel(model);
 
   let index = null;   // { keys:[{k, rows:[row index]}] }
   function buildIndex() {
@@ -122,10 +104,19 @@
     return out;
   }
 
-  function matchTokens(tokens, brands) {
+  function matchTokens(tokens, brands, exact) {
     const { keys } = buildIndex();
     const best = new Map();   // row index → {score, sim, tok}
     const tokScore = new Map();
+    // 利用者が打ち直した文字は、「PC20」「320」のような短い・数字だけの型式も含め、完全一致を先に出す
+    if (exact) {
+      keys.forEach((e) => {
+        const full = e.k === exact;
+        if (!full && !e.k.startsWith(exact)) return;   // 「PC200」→「PC200-8」のような前方一致は完全一致の後ろに出す
+        const hit = { score: full ? 2 : 1.5, sim: full ? 1 : 0.9, tok: tokens.get(exact) || exact };
+        e.rows.forEach((ri) => { const cur = best.get(ri); if (!cur || hit.score > cur.score) best.set(ri, hit); });
+      });
+    }
     tokens.forEach((show, t) => {
       // 型式キーは数千件なので、絞り込まず全件と比べる（取りこぼし防止）
       keys.forEach((e) => {
@@ -221,7 +212,7 @@
 
   // ---------- 画面 ----------
   let run = 0;   // 新しい撮影が始まったら古い処理を打ち切る
-  const state = { tokens: new Map(), brands: [] };
+  const state = { tokens: new Map(), brands: [], exact: '' };
 
   function openPanel() { panel.hidden = false; }
   function closePanel() { run++; panel.hidden = true; }
@@ -237,13 +228,14 @@
       </div>
       <div class="cam-chips" id="camChips"></div>
       <div id="camResults"></div>
-      <p class="cam-note">写真は端末の中だけで処理され、外部には送りません。刻印・汚れ・反射のある銘板は読み間違えます。候補は必ず銘板の型式と見比べ、発注前に原本カタログで確認してください。うまく読めないときは、型式の部分に近づけて撮り直すか、上の欄に型式を打ち直してください。</p>`;
+      <p class="cam-note">写真は端末の中だけで処理され、外部には送りません。刻印・汚れ・反射のある銘板は読み間違えます。候補は必ず銘板の型式と見比べ、発注前に原本カタログで確認してください。うまく読めないときは、型式の部分に近づけて撮り直すか、上の欄に型式を打ち直してください。「PC20」「320」のような短い型式・数字だけの型式は写真からは自動で拾わないため、上の欄に打ち直して「この文字で探す」を押してください（完全一致で探します）。</p>`;
     panel.querySelector('#camClose').addEventListener('click', closePanel);
     panel.querySelector('#camGo').addEventListener('click', () => {
       const t = panel.querySelector('#camText').value;
       state.tokens = tokensFrom(t);
       const one = App.normModel(t);   // 手入力は区切りのない1語も候補にする
       if (one.length >= 3 && !state.tokens.has(one)) state.tokens.set(one, t.trim());
+      state.exact = one.length >= 3 ? one : '';
       showHits(true);
     });
     panel.querySelector('#camText').addEventListener('keydown', (e) => { if (e.key === 'Enter') panel.querySelector('#camGo').click(); });
@@ -253,10 +245,16 @@
       panel.querySelector('#camGo').click();
     });
   }
+  // 候補カード内の品番ボタン → 通常の品番検索へ（panel 自体は作り直されないので1回だけ登録）
+  panel.addEventListener('click', (e) => {
+    const b = e.target.closest('#camResults .pn'); if (!b) return;
+    closePanel();
+    App.searchByPart(b.dataset.pn, { resetFilters: true });
+  });
   const setStatus = (t) => { const el = panel.querySelector('#camStatus'); if (el) el.textContent = t; };
 
   function showHits(keepText) {
-    const { hits, tokScore } = matchTokens(state.tokens, state.brands);
+    const { hits, tokScore } = matchTokens(state.tokens, state.brands, state.exact);
     const textEl = panel.querySelector('#camText');
     const chips = [...state.tokens.entries()].sort((a, b) => (tokScore.get(b[0]) || 0) - (tokScore.get(a[0]) || 0)).slice(0, 8);
     if (!keepText && textEl && !textEl.value && chips.length) textEl.value = chips[0][1];
@@ -298,7 +296,7 @@
     const my = ++run;
     openPanel();
     shell(url);
-    state.tokens = new Map(); state.brands = [];
+    state.tokens = new Map(); state.brands = []; state.exact = '';
     panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
     try {
       const W = bmp.width, H = bmp.height;
@@ -356,7 +354,9 @@
   // 画面いっぱいにカメラ映像を出し、中央の□に型式の文字を収めて撮る。□の中だけを切り出して読むので、
   // 周りの文字・汚れ・反射を拾いにくく、文字も大きく読める。
   let liveEl = null, liveStream = null, torchOn = false;
+  let liveSeq = 0;   // 撮影画面を開くたび・閉じるたびに進める。カメラ取得待ちの間に閉じられたかを見分ける
   function stopLive() {
+    liveSeq++;
     if (liveStream) liveStream.getTracks().forEach((t) => t.stop());
     liveStream = null; torchOn = false;
     if (liveEl) { liveEl.remove(); liveEl = null; }
@@ -384,20 +384,29 @@
     const video = liveEl.querySelector('video');
     liveEl.querySelector('#camLiveX').addEventListener('click', stopLive);
     liveEl.querySelector('#camPick').addEventListener('click', () => { stopLive(); fileEl.click(); });
+    const my = ++liveSeq;
+    let stream;
     try {
-      liveStream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false,
       });
     } catch (e) {
+      if (my !== liveSeq) return;   // 取得を待つ間に閉じられた
       stopLive();
       // カメラの許可がない・使えない場合は、従来の写真選択に切り替える
       fileEl.click();
       return;
     }
+    if (my !== liveSeq) {   // 取得を待つ間に閉じられた：得たカメラを使わずすぐ止める
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    liveStream = stream;
     video.srcObject = liveStream;
     video.play().catch(() => {});
     const track = liveStream.getVideoTracks()[0];
     try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) { /* 非対応でも可 */ }
+    if (my !== liveSeq) return;   // 閉じられていれば stopLive が停止済み
     try {
       const caps = track.getCapabilities ? track.getCapabilities() : {};
       if (caps.torch) {

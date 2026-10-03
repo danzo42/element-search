@@ -1,5 +1,5 @@
 // データを更新したら VERSION を上げる（端末側のキャッシュが入れ替わる）
-const VERSION = 'peacock-ele-v60';
+const VERSION = 'peacock-ele-v61';
 const VENDOR = 'peacock-vendor-v1';   // 部品(vendor/)用。部品を差し替えるときだけ番号を上げる
 const ASSETS = [
   './',
@@ -25,7 +25,10 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== VENDOR).map((k) => caches.delete(k))))
+      // 同じ配信元の別アプリのキャッシュは消さない。このアプリの名前の旧版だけを削除する
+      .then((keys) => Promise.all(keys
+        .filter((k) => (k.startsWith('peacock-ele-') && k !== VERSION) || (k.startsWith('peacock-vendor-') && k !== VENDOR))
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

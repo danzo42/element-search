@@ -38,9 +38,16 @@
   const OEM_RE = /^(?:YM\d|HD\d|\d{2,4}[A-Z]?-\d{2}-\d{4,5}|\d{3}-\d{3}-\d{4}|[0-9A-Z]{3}-\d{2}-\d{5}|\d{6}-\d{5}|\d{7}|\d{9,10}$)/;
 
   // セル文字列を [{text, key, search, oem, unknown}] の断片に分ける
+  // 原本で淡色（純正品番・検証中）の値は [ ] で囲まれて届く。セル全体が [ ] なら全品番が純正、
+  // 一部だけ [ ] ならその中の品番が純正。品番の形（OEM_RE）による推定は補助。
   function splitCell(cell) {
-    const raw0 = String(cell || '');
+    let raw0 = String(cell || '').trim();
+    const whole = /^\[(.*)\]$/.exec(raw0);
+    if (whole) raw0 = whole[1];
     const s = raw0.replace(PAIR_SPLIT, '$1 $2$3$4=').replace(LABEL_SPLIT, '$1 $2=');
+    const lightSpans = [];
+    if (!whole) for (const b of s.matchAll(/\[[^\]]*\]/g)) lightSpans.push([b.index, b.index + b[0].length]);
+    const isLightAt = (i) => !!whole || lightSpans.some(([a, z]) => i >= a && i < z);
     const out = [];
     let last = 0, m;
     PART_RE.lastIndex = 0;
@@ -65,7 +72,7 @@
       if (m.index > last) out.push({ text: s.slice(last, m.index) });
       const opt = tok.match(/^(.*)\(([A-Z])\)$/);
       const search = opt ? [opt[1], opt[1] + opt[2]] : [tok];
-      out.push({ text: tok, key: tok, search, oem: OEM_RE.test(search[0]) });
+      out.push({ text: tok, key: tok, search, oem: isLightAt(m.index) || OEM_RE.test(search[0]) });
       last = m.index + tok.length;
     }
     if (last < s.length) out.push({ text: s.slice(last) });
@@ -82,10 +89,54 @@
   }
 
   // ---------- 行データの準備 ----------
+  const MODEL_SEP = /[,、・/]/;
+  // 括弧の外にある区切りでだけ分ける（「PC200(LC,SC)-6」の括弧内のカンマで切らない）
+  function splitTop(s) {
+    const out = [];
+    let depth = 0, cur = '';
+    for (const ch of s) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth = Math.max(0, depth - 1);
+      if (depth === 0 && MODEL_SEP.test(ch)) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out.filter(Boolean);
+  }
+  // 括弧は「外した形」と「各選択肢を付けた形」のすべてに展開する
+  function expandParens(p, out) {
+    const m = p.match(/^(.*?)\(([^)]*)\)(.*)$/);
+    if (!m) { out.add(p); return; }
+    expandParens(m[1] + m[3], out);
+    m[2].split(MODEL_SEP).filter(Boolean).forEach((opt) => expandParens(m[1] + opt + m[3], out));
+  }
+  // 「PC40-1,2,3」「PC200-8,-10」「FL140,160」「PC60(L,U)-1,2」のような併記を、個別の型式（正規化済み）に展開する
+  function expandModel(model) {
+    const s = String(model).replace(/\s+/g, '');
+    const parts = splitTop(s);
+    const raws = new Set();
+    const first = parts[0] || '';
+    raws.add(first);
+    const lastDash = first.lastIndexOf('-');
+    const base = lastDash > 0 ? first.slice(0, lastDash) : first.replace(/\d+[A-Z]*(?:\([^)]*\))?$/i, '');
+    const stem = first.replace(/\d+[A-Z]*(?:\([^)]*\))?$/i, '');
+    const lead = (first.match(/^[^(\d]*\d+/) || [''])[0];   // 「PC40PR」の先頭「PC40」
+    parts.slice(1).forEach((p) => {
+      if (/^-/.test(p)) raws.add(base + p);
+      else if (/^\d/.test(p)) raws.add(stem + p);
+      else { raws.add(p); if (lead) raws.add(lead + p); }
+    });
+    const out = new Set();
+    raws.forEach((r) => expandParens(r, out));
+    return [...out].map(normModel).filter((k) => k.length >= 3);
+  }
+
   function aliasModel(model) {
     const alias = model.replace(/([A-Z]+)(\d+)·(\d+)/g, '$1$3');
     const noParen = model.replace(/\([^)]*\)/g, '');
-    return [model, alias, noParen].map(normModel).join('|');
+    const keys = new Set([model, alias, noParen].map(normModel));
+    expandModel(model).forEach((k) => keys.add(k));
+    if (alias !== model) expandModel(alias).forEach((k) => keys.add(k));
+    return [...keys].join('|');
   }
 
   const rows = DATA.rows.map((r, i) => {
@@ -104,21 +155,12 @@
     };
   });
 
-  // 品番 → 件数（品番一覧用）
-  const partIndex = new Map(ALL_COLS.map((c) => [c.key, new Map()]));
-  rows.forEach((row) => row.cols.forEach((c, ci) => {
-    const map = partIndex.get(c.key);
-    new Set(row.cells[ci].filter((f) => f.key).map((f) => f.key)).forEach((k) => {
-      const cur = map.get(k) || { count: 0, oem: OEM_RE.test(k) };
-      cur.count++; map.set(k, cur);
-    });
-  }));
-
   const makerCounts = new Map();
   rows.forEach((r) => makerCounts.set(r.maker, (makerCounts.get(r.maker) || 0) + 1));
 
   // ---------- 状態 ----------
-  const state = { mode: 'model', q: '', maker: '', cat: '', shown: PAGE_SIZE };
+  // exactQ: 品番ボタンから検索したときの品番（入力欄がこの品番のままの間は完全一致だけを出し、一覧の件数と揃える）
+  const state = { mode: 'model', q: '', maker: '', cat: '', shown: PAGE_SIZE, exactQ: '' };
   try {
     const saved = JSON.parse(localStorage.getItem('ele-state') || '{}');
     if (saved.mode === 'part' || saved.mode === 'model') state.mode = saved.mode;
@@ -145,7 +187,7 @@
       if (r.partKeys.some((k) => k === q)) exact.push(r);
       else if (r.partKeys.some((k) => k.startsWith(q))) prefix.push(r);
     });
-    return exact.concat(prefix);
+    return state.exactQ && state.exactQ === q ? exact : exact.concat(prefix);
   }
 
   // ---------- 描画 ----------
@@ -205,17 +247,19 @@
   }
 
   function renderPartIndex() {
+    // 選択中のメーカー・機種区分の行だけから、そのメーカーの列ごとに品番と該当行数を数える（純正品番は除く）
+    const counts = new Map(ALL_COLS.map((c) => [c.key, new Map()]));
+    baseRows().forEach((row) => row.cols.forEach((c, ci) => {
+      const map = counts.get(c.key);
+      new Set(row.cells[ci].filter((f) => f.key && !f.oem).map((f) => f.key)).forEach((k) => map.set(k, (map.get(k) || 0) + 1));
+    }));
     const html = ALL_COLS.map((c) => {
-      const list = [...partIndex.get(c.key).entries()]
-        .filter(([k, v]) => !v.oem)
-        .sort((a, b) => a[0].localeCompare(b[0], 'ja', { numeric: true }));
-      // メーカー絞り込み時は、そのメーカーに存在する品番だけを出す
-      const shown = state.maker
-        ? list.filter(([k]) => rows.some((r) => r.maker === state.maker && r.partKeys.includes(normPart(k))))
-        : list;
+      const shown = [...counts.get(c.key).entries()].sort((a, b) => a[0].localeCompare(b[0], 'ja', { numeric: true }));
       if (!shown.length) return '';
-      const btns = shown.map(([k, v]) => `<button class="pn" data-pn="${esc(k)}">${esc(k)}<small>${v.count}</small></button>`).join('');
-      return `<section><h2><span class="lbl ${c.key}">${esc(c.label)}</span>${shown.length} 品番</h2><div class="pn-grid">${btns}</div></section>`;
+      const mk = state.maker ? MAKER_BY_ID[state.maker] : null;
+      const label = (mk && mk.labels && mk.labels[c.key]) || c.label;
+      const btns = shown.map(([k, n]) => `<button class="pn" data-pn="${esc(k)}">${esc(k)}<small>${n}</small></button>`).join('');
+      return `<section><h2><span class="lbl ${c.key}">${esc(label)}</span>${shown.length} 品番</h2><div class="pn-grid">${btns}</div></section>`;
     }).join('');
     resultsEl.innerHTML = `<div class="pn-index">${html}</div>`;
     statusEl.textContent = '品番をタップすると、その品番を使う型式を表示します（数字は該当行数）。STはCATの「ステアリング」／日立・住友建機の「サクション」／北越工業の「コンプエア」、TMはCATの「TM・パイロット」／日立・住友建機の「ドレン・パイロット」／北越工業の「コンプオイル」、川崎重工業のSTは「作動油リターン」です';
@@ -246,7 +290,8 @@
     }
     const slice = list.slice(0, state.shown);
     resultsEl.innerHTML = slice.map(renderRow).join('');
-    const label = state.mode === 'part' ? `品番「${toHalf(state.q)}」を含む型式` : '該当';
+    const exactPart = state.mode === 'part' && state.exactQ && state.exactQ === normPart(state.q);
+    const label = state.mode === 'part' ? `品番「${toHalf(state.q)}」${exactPart ? 'を使う' : 'を含む'}型式` : '該当';
     const scope = [state.maker ? MAKER_BY_ID[state.maker].name : '', state.cat].filter(Boolean).join(' / ');
     statusEl.textContent = `${label} ${list.length} 件${scope ? `（${scope}）` : ''}`;
     moreEl.hidden = list.length <= state.shown;
@@ -301,12 +346,19 @@
     const b = e.target.closest('.cat'); if (!b) return;
     state.cat = b.dataset.cat; renderCats(); render();
   });
-  resultsEl.addEventListener('click', (e) => {
-    const b = e.target.closest('.pn'); if (!b) return;
+  // 品番ボタンから品番検索へ。カメラ候補は全メーカーが対象なので、そこからはメーカー・区分の絞り込みを外す
+  function searchByPart(pn, opts = {}) {
+    if (opts.resetFilters && (state.maker || state.cat)) {
+      state.maker = ''; state.cat = ''; saveState(); renderMakers(); renderCats();
+    }
     setMode('part');
-    qEl.value = b.dataset.pn; state.q = b.dataset.pn; $('clear').hidden = false;
+    qEl.value = pn; state.q = pn; state.exactQ = normPart(pn); $('clear').hidden = false;
     render();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  resultsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.pn'); if (!b) return;
+    searchByPart(b.dataset.pn);
   });
   moreEl.addEventListener('click', () => { state.shown += PAGE_SIZE; render(false); });
 
@@ -345,7 +397,7 @@
 
   // カメラ検索（camera.js）から使う入口
   window.PeacockApp = {
-    rows, renderRow, esc, normModel, MAKER_BY_ID,
+    rows, renderRow, esc, normModel, expandModel, searchByPart, MAKER_BY_ID,
     searchByText(text) { setMode('model'); qEl.value = text; state.q = text; $('clear').hidden = !text; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
   };
 

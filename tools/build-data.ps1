@@ -1,4 +1,4 @@
-# data-src/<メーカー>/p*.tsv から public/data.js と確認用CSVを生成する
+﻿# data-src/<メーカー>/p*.tsv から public/data.js と確認用CSVを生成する
 #
 # TSV列（メーカー共通の先頭9列）:
 #   0 ページ, 1 機種区分, 2 型式, 3 エンジン, 4 シリアル, 5 オイル, 6 エア, 7 燃料, 8 作動油
@@ -37,12 +37,11 @@ foreach ($mk in $makers) {
       $ditto = @()
       for ($i = 0; $i -lt 4; $i++) {
         if ($c[5 + $i] -eq '〃') { $c[5 + $i] = $prev[$i]; $ditto += $i }
-        $c[5 + $i] = $c[5 + $i] -replace '^\[(.*)\]$', '$1'   # [ ] は薄い文字を示す目印
+        # [ ] は原本の薄い文字（純正品番・検証中）を示す目印。アプリ側で純正品番の表示に使うので残す
         $prev[$i] = $c[5 + $i]
       }
       $st = ''; $tm = ''; $note = ''
       if ($width -eq 12) {
-        foreach ($k in 9, 10) { $c[$k] = $c[$k] -replace '^\[(.*)\]$', '$1' }
         $st = $c[9]; $tm = $c[10]; $note = $c[11]
       } else { $note = $c[9] }
       $page = [int]$c[0]
