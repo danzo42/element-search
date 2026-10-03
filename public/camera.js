@@ -148,7 +148,7 @@
 
   // ---------- 画像の前処理 ----------
   function grayCanvas(src, sx, sy, sw, sh, maxEdge, mode) {
-    const s = Math.min(1, maxEdge / Math.max(sw, sh));
+    const s = Math.min(2, maxEdge / Math.max(sw, sh));   // 小さい切り出しは最大2倍まで拡大して読む
     const w = Math.max(1, Math.round(sw * s)), h = Math.max(1, Math.round(sh * s));
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d', { willReadFrequently: true });
@@ -276,18 +276,30 @@
     }).join('');
   }
 
+  // 写真ファイル（ギャラリーから選んだ写真）を読む
   async function handleFile(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const bmp = await (window.createImageBitmap ? createImageBitmap(file).catch(() => null) : null) || await new Promise((res, rej) => {
+        const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('写真を開けませんでした')); im.src = url;
+      });
+      await recognizeImage(bmp, url, false);
+    } catch (e) {
+      run++; openPanel(); shell(url);
+      setStatus('エラー: ' + (e && e.message ? e.message : e));
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  }
+
+  // 画像（ビットマップ/キャンバス）を読む。cropped=true は撮影ガイド枠の中だけを切り出した画像
+  async function recognizeImage(bmp, url, cropped) {
     const my = ++run;
     openPanel();
-    const url = URL.createObjectURL(file);
     shell(url);
     state.tokens = new Map(); state.brands = [];
     panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
     try {
-      setStatus('写真を読み込んでいます…');
-      const bmp = await (window.createImageBitmap ? createImageBitmap(file).catch(() => null) : null) || await new Promise((res, rej) => {
-        const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('写真を開けませんでした')); im.src = url;
-      });
       const W = bmp.width, H = bmp.height;
       setStatus('文字認識の準備をしています…（初回は部品の読み込みに少し時間がかかります）');
       const worker = await getWorker();
@@ -299,14 +311,26 @@
         tokensFrom(text).forEach((show, k) => { if (!state.tokens.has(k)) state.tokens.set(k, show); });
         showHits(!!panel.querySelector('#camText').value);
       };
-      const passes = [
-        { label: '全体', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '11' },
-        { label: '全体（段落）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '6' },
-        { label: '全体（コントラスト強調）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '11' },
-      ];
-      // 写真を重なりのある4分割にして、小さい文字も拡大して読む
-      const tw = Math.round(W * 0.62), th = Math.round(H * 0.62);
-      [[0, 0], [W - tw, 0], [0, H - th], [W - tw, H - th]].forEach(([x, y], i) => passes.push({ label: `部分${i + 1}/4`, box: [x, y, tw, th], edge: 2200, mode: 'stretch', psm: '11' }));
+      let passes;
+      if (cropped) {
+        // ガイド枠の中は型式の1〜2行だけなので、1行読み(psm 7)・段落読み(6)・コントラスト強調を組み合わせて読む
+        passes = [
+          { label: '枠内（1行）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '7' },
+          { label: '枠内（段落）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '6' },
+          { label: '枠内（コントラスト強調・1行）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '7' },
+          { label: '枠内（コントラスト強調・段落）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '6' },
+          { label: '枠内（文字を探す）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '11' },
+        ];
+      } else {
+        passes = [
+          { label: '全体', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '11' },
+          { label: '全体（段落）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '6' },
+          { label: '全体（コントラスト強調）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '11' },
+        ];
+        // 写真を重なりのある4分割にして、小さい文字も拡大して読む
+        const tw = Math.round(W * 0.62), th = Math.round(H * 0.62);
+        [[0, 0], [W - tw, 0], [0, H - th], [W - tw, H - th]].forEach(([x, y], i) => passes.push({ label: `部分${i + 1}/4`, box: [x, y, tw, th], edge: 2200, mode: 'stretch', psm: '11' }));
+      }
       for (let i = 0; i < passes.length; i++) {
         if (my !== run) return;
         const p = passes[i];
@@ -318,26 +342,108 @@
         if (my !== run) return;
         absorb(r.data.text || '');
       }
-      setStatus(state.tokens.size ? '読み取り完了。読めた文字を直す・タップする、または候補から選んでください。' : '文字を読み取れませんでした。型式の部分に近づけて撮り直すか、上の欄に型式を入力してください。');
+      setStatus(state.tokens.size ? '読み取り完了。読めた文字を直す・タップする、または候補から選んでください。' : '文字を読み取れませんでした。型式の部分を枠いっぱいに撮り直すか、上の欄に型式を入力してください。');
       if (bmp.close) bmp.close();
     } catch (e) {
       if (my === run) setStatus('エラー: ' + (e && e.message ? e.message : e));
-    } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
   }
 
-  // 📷ボタンは <label for="camFile"> なので、押すとブラウザの標準動作で写真選択（カメラ）が開く。
-  // キーボード操作（Enter/Space）だけ補う。
+  // ---------- ガイド枠つきの撮影画面 ----------
+  // 画面いっぱいにカメラ映像を出し、中央の□に型式の文字を収めて撮る。□の中だけを切り出して読むので、
+  // 周りの文字・汚れ・反射を拾いにくく、文字も大きく読める。
+  let liveEl = null, liveStream = null, torchOn = false;
+  function stopLive() {
+    if (liveStream) liveStream.getTracks().forEach((t) => t.stop());
+    liveStream = null; torchOn = false;
+    if (liveEl) { liveEl.remove(); liveEl = null; }
+    document.body.classList.remove('cam-live-open');
+  }
+  const canLive = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+  async function openLive() {
+    if (liveEl) return;
+    if (!canLive()) { fileEl.click(); return; }
+    liveEl = document.createElement('div');
+    liveEl.className = 'cam-live';
+    liveEl.innerHTML = `
+      <video class="cam-video" playsinline muted autoplay></video>
+      <div class="cam-frame" id="camFrame"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></div>
+      <p class="cam-hint">型式の文字を<b>□の中いっぱい</b>に収めてください<br><small>ピントが合うまで少し待ってから、シャッターを押します</small></p>
+      <button type="button" class="cam-live-x" id="camLiveX" aria-label="閉じる">✕</button>
+      <div class="cam-bar">
+        <button type="button" class="cam-side" id="camPick">🖼<span>写真から選ぶ</span></button>
+        <button type="button" class="cam-shot" id="camShot" aria-label="撮影"><i></i></button>
+        <button type="button" class="cam-side" id="camLight" hidden>💡<span>ライト</span></button>
+      </div>`;
+    document.body.appendChild(liveEl);
+    document.body.classList.add('cam-live-open');
+    const video = liveEl.querySelector('video');
+    liveEl.querySelector('#camLiveX').addEventListener('click', stopLive);
+    liveEl.querySelector('#camPick').addEventListener('click', () => { stopLive(); fileEl.click(); });
+    try {
+      liveStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false,
+      });
+    } catch (e) {
+      stopLive();
+      // カメラの許可がない・使えない場合は、従来の写真選択に切り替える
+      fileEl.click();
+      return;
+    }
+    video.srcObject = liveStream;
+    video.play().catch(() => {});
+    const track = liveStream.getVideoTracks()[0];
+    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) { /* 非対応でも可 */ }
+    try {
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.torch) {
+        const lb = liveEl.querySelector('#camLight');
+        lb.hidden = false;
+        lb.addEventListener('click', async () => {
+          torchOn = !torchOn;
+          try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); lb.classList.toggle('on', torchOn); } catch (e) { torchOn = false; }
+        });
+      }
+    } catch (e) { /* ライト非対応 */ }
+    liveEl.querySelector('#camShot').addEventListener('click', () => shoot(video));
+  }
+
+  // □の位置を、カメラ映像（object-fit: cover）上の座標に直して、その部分だけを切り出す
+  function shoot(video) {
+    if (!video.videoWidth) return;
+    const box = liveEl.getBoundingClientRect();
+    const fr = liveEl.querySelector('#camFrame').getBoundingClientRect();
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const scale = Math.max(box.width / vw, box.height / vh);
+    const offX = (vw * scale - box.width) / 2, offY = (vh * scale - box.height) / 2;
+    const pad = 0.05;   // 文字が枠の縁にかかってもよいよう、枠より少し広めに取る
+    let sx = (fr.left - box.left + offX) / scale - fr.width / scale * pad;
+    let sy = (fr.top - box.top + offY) / scale - fr.height / scale * pad;
+    let sw = fr.width / scale * (1 + pad * 2), sh = fr.height / scale * (1 + pad * 2);
+    sx = Math.max(0, sx); sy = Math.max(0, sy);
+    sw = Math.min(vw - sx, sw); sh = Math.min(vh - sy, sh);
+    const c = document.createElement('canvas');
+    c.width = Math.round(sw); c.height = Math.round(sh);
+    c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/jpeg', 0.85);
+    stopLive();
+    recognizeImage(c, url, true);
+  }
+
+  // 📷ボタンは <label for="camFile"> なので、JSが動かなくても写真選択は開く。
+  // カメラが使える環境では、写真選択ではなくガイド枠つきの撮影画面を開く。
   [camBtn, document.getElementById('camWide')].forEach((el) => {
     if (!el) return;
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileEl.click(); } });
+    el.addEventListener('click', (e) => { if (canLive()) { e.preventDefault(); openLive(); } });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (canLive()) openLive(); else fileEl.click(); } });
   });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && liveEl) stopLive(); });
   fileEl.addEventListener('change', () => {
     const f = fileEl.files && fileEl.files[0];
     if (f) handleFile(f);
     fileEl.value = '';   // 同じ写真をもう一度選んでも反応するように
   });
 
-  window.__camera = { similarity, expandModel, tokensFrom, matchTokens, detectBrands, handleFile };
+  window.__camera = { similarity, expandModel, tokensFrom, matchTokens, detectBrands, handleFile, openLive, shoot };
 })();

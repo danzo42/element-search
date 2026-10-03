@@ -224,3 +224,31 @@ mark { background: var(--hit); color: inherit; border-radius: 3px; }
 .cam-bm { background: var(--hit); color: var(--text); border-radius: 6px; padding: 1px 7px; font-weight: 700; }
 .cam-from { color: var(--muted); }
 .cam-note { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+
+/* ---------- 銘板撮影画面（ガイド枠） ---------- */
+body.cam-live-open { overflow: hidden; }
+.cam-live { position: fixed; inset: 0; z-index: 100; background: #000; color: #fff; }
+.cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+/* □の外側を暗くして、枠の中に文字を収めやすくする */
+.cam-frame {
+  position: absolute; left: 5%; right: 5%; top: 30%; height: clamp(96px, 30vw, 190px);
+  border: 2px solid rgba(255,255,255,.9); border-radius: 8px; box-sizing: border-box;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,.55);
+}
+.cam-frame .c { position: absolute; width: 22px; height: 22px; border: 0 solid var(--accent); }
+.cam-frame .tl { left: -3px; top: -3px; border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 8px; }
+.cam-frame .tr { right: -3px; top: -3px; border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 8px; }
+.cam-frame .bl { left: -3px; bottom: -3px; border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 8px; }
+.cam-frame .br { right: -3px; bottom: -3px; border-bottom-width: 4px; border-right-width: 4px; border-bottom-right-radius: 8px; }
+.cam-hint { position: absolute; left: 0; right: 0; top: calc(30% + clamp(96px, 30vw, 190px) + 14px); margin: 0; padding: 0 16px; text-align: center; font-size: 16px; line-height: 1.5; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+.cam-hint b { color: var(--accent); }
+.cam-hint small { font-size: 13px; opacity: .9; }
+.cam-live-x { position: absolute; top: calc(env(safe-area-inset-top) + 10px); right: 12px; width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 22px; }
+.cam-bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 20px calc(env(safe-area-inset-bottom) + 18px); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
+.cam-side { width: 84px; min-height: 56px; border: 0; border-radius: 12px; background: rgba(255,255,255,.18); color: #fff; font-size: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.cam-side span { font-size: 11px; }
+.cam-side.on { background: var(--accent); color: #123a63; }
+.cam-side[hidden] { display: block; visibility: hidden; }
+.cam-shot { width: 76px; height: 76px; border-radius: 50%; border: 4px solid #fff; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; }
+.cam-shot i { display: block; width: 58px; height: 58px; border-radius: 50%; background: #fff; }
+.cam-shot:active i { background: var(--accent); }
