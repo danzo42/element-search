@@ -30,7 +30,7 @@
       <input id="q" type="search" inputmode="search" autocomplete="off" autocapitalize="characters" spellcheck="false"
              placeholder="例: PC200 / 320 / EX200 / SAA6D107">
       <button id="clear" class="clear" aria-label="入力を消す" hidden>×</button>
-      <button id="camBtn" class="cam" type="button" aria-label="銘板を撮影して型式を探す" title="銘板を撮影して型式を探す">📷</button>
+      <label for="camFile" id="camBtn" class="cam" role="button" tabindex="0" aria-label="銘板を撮影して型式を探す">📷</label>
     </div>
     <div id="cats" class="cats" aria-label="機種区分"></div>
   </header>
@@ -42,7 +42,8 @@
 
   <main>
     <section id="camPanel" class="cam-panel" hidden aria-live="polite"></section>
-    <input id="camFile" type="file" accept="image/*" capture="environment" hidden>
+    <label for="camFile" id="camWide" class="cam-wide" role="button" tabindex="0">📷 銘板を撮影して型式を探す</label>
+    <input id="camFile" class="cam-file" type="file" accept="image/*" capture="environment" aria-label="銘板の写真">
     <p class="caution">品番・OEMコードはカタログ上で確認中の項目を含みます。発注前に原本カタログでご確認ください。</p>
     <p id="status" class="status" aria-live="polite"></p>
     <div id="results"></div>

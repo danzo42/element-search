@@ -185,12 +185,25 @@ mark { background: var(--hit); color: inherit; border-radius: 3px; }
 .unk { background: var(--unk-bg); color: var(--unk); border: 1px solid var(--unk); border-radius: 5px; padding: 0 5px; font-weight: 800; margin: 0 1px; }
 .page .mk { font-weight: 700; color: var(--text); margin-right: 2px; }
 /* ---------- 銘板カメラ検索 ---------- */
+/* スマホで押しやすいよう 54px 幅・入力欄いっぱいの高さにする。labelなのでJSに頼らず標準動作で写真選択が開く */
 .cam {
-  position: absolute; right: 44px; top: 50%; transform: translateY(-50%);
-  width: 34px; height: 34px; border-radius: 50%; border: 0;
-  background: #e3e8ee; color: #333; font-size: 17px; line-height: 1;
+  position: absolute; right: 0; top: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 54px; min-height: 48px; border: 0; border-radius: 0 10px 10px 0;
+  background: var(--accent); color: #123a63; font-size: 24px; line-height: 1; cursor: pointer;
+  -webkit-tap-highlight-color: rgba(0,0,0,.15); touch-action: manipulation; user-select: none;
 }
-#q { padding-right: 84px; }
+.cam:active, .cam-wide:active { filter: brightness(.9); }
+#q { padding-right: 116px; min-height: 48px; }
+.search .clear { right: 60px; width: 40px; height: 40px; }
+.cam-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); pointer-events: none; }
+.cam-wide {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; margin: 4px 0 10px; border-radius: 12px; border: 2px solid var(--brand);
+  background: var(--surface); color: var(--brand); font-size: 17px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: rgba(0,0,0,.12); touch-action: manipulation; user-select: none;
+}
+@media (prefers-color-scheme: dark) { .cam-wide { color: var(--chip-ink); border-color: var(--chip-ink); } }
 .cam-panel {
   background: var(--surface); border: 2px solid var(--brand); border-radius: 12px;
   padding: 10px 12px 12px; margin: 8px 0 14px;

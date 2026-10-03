@@ -327,8 +327,17 @@
     }
   }
 
-  camBtn.addEventListener('click', () => { fileEl.value = ''; fileEl.click(); });
-  fileEl.addEventListener('change', () => { const f = fileEl.files && fileEl.files[0]; if (f) handleFile(f); });
+  // 📷ボタンは <label for="camFile"> なので、押すとブラウザの標準動作で写真選択（カメラ）が開く。
+  // キーボード操作（Enter/Space）だけ補う。
+  [camBtn, document.getElementById('camWide')].forEach((el) => {
+    if (!el) return;
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileEl.click(); } });
+  });
+  fileEl.addEventListener('change', () => {
+    const f = fileEl.files && fileEl.files[0];
+    if (f) handleFile(f);
+    fileEl.value = '';   // 同じ写真をもう一度選んでも反応するように
+  });
 
   window.__camera = { similarity, expandModel, tokensFrom, matchTokens, detectBrands, handleFile };
 })();
