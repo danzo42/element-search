@@ -157,7 +157,11 @@
     const d = x.getImageData(0, 0, w, h);
     const px = d.data, n = w * h, g = new Float32Array(n);
     for (let i = 0, j = 0; j < n; i += 4, j++) g[j] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-    if (mode === 'local') {
+    if (mode === 'edge') {
+      // 薄い彫り込み・刻印の文字向け：周りの明るさとの差（明るい縁も暗い縁も）を黒い線にして、細い文字を読めるようにする
+      const bg = blurApprox(g, w, h, 10);
+      for (let j = 0; j < n; j++) g[j] = 255 - Math.min(255, Math.abs(g[j] - bg[j]) * 10);
+    } else if (mode === 'local') {
       // 明るさのムラを引いて、文字の凹凸だけを強調する（淡色・刻印の銘板向け）
       const bg = blurApprox(g, w, h, 24);
       for (let j = 0; j < n; j++) g[j] = (g[j] - bg[j]) * 8 + 200;
@@ -315,6 +319,8 @@
       if (cropped) {
         // ガイド枠の中は型式の1〜2行だけなので、1行読み(psm 7)・段落読み(6)・コントラスト強調を組み合わせて読む
         passes = [
+          { label: '枠内（彫り込み文字向け・1行）', box: [0, 0, W, H], edge: 1400, mode: 'edge', psm: '7' },
+          { label: '枠内（彫り込み文字向け・1語）', box: [0, 0, W, H], edge: 1400, mode: 'edge', psm: '8' },
           { label: '枠内（1行）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '7' },
           { label: '枠内（段落）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '6' },
           { label: '枠内（コントラスト強調・1行）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '7' },
