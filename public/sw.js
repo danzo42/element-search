@@ -1,11 +1,13 @@
 // データを更新したら VERSION を上げる（端末側のキャッシュが入れ替わる）
-const VERSION = 'peacock-ele-v55';
+const VERSION = 'peacock-ele-v56';
+const VENDOR = 'peacock-vendor-v1';   // 部品(vendor/)用。部品を差し替えるときだけ番号を上げる
 const ASSETS = [
   './',
   'index.html',
   'style.css',
   'app.js',
   'camera.js',
+  'paddle.js',
   'data.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
@@ -23,7 +25,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== VENDOR).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -38,7 +40,9 @@ self.addEventListener('fetch', (event) => {
       return fetch(req).then((res) => {
         if (res.ok) {
           const copy = res.clone();
-          caches.open(VERSION).then((cache) => cache.put(req, copy));
+          // 文字認識の部品（約22MB）は、アプリのデータ更新のたびに取り直さないよう別の保存領域に置く
+          const target = new URL(req.url).pathname.includes('/vendor/') ? VENDOR : VERSION;
+          caches.open(target).then((cache) => cache.put(req, copy));
         }
         return res;
       }).catch(() => (req.mode === 'navigate' ? caches.match('index.html') : Response.error()));

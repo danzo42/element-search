@@ -1,4 +1,4 @@
-// 銘板カメラ検索: 撮影した銘板の写真を端末内でOCR（Tesseract.js）し、近い型式をカタログから探す。
+// 銘板カメラ検索: 撮影した銘板の写真を端末内でOCR（PaddleOCR・paddle.js）し、近い型式をカタログから探す。
 // 写真・読み取り結果は端末の外へ送らない。OCRは「読めた文字」を候補として出すだけで、最終確認は利用者が行う。
 (() => {
   'use strict';
@@ -9,7 +9,6 @@
   if (!App || !camBtn || !fileEl || !panel) return;
 
   const esc = App.esc;
-  const TESS_DIR = new URL('vendor/tesseract/', location.href).href;
   const MAX_HITS = 15;
   const MIN_SIM = 0.68;     // これ未満は候補にしない
   const BRAND_BONUS = 0.08;  // 写真にメーカー名が写っていたときの加点
@@ -147,20 +146,23 @@
   }
 
   // ---------- 画像の前処理 ----------
-  function grayCanvas(src, sx, sy, sw, sh, maxEdge, mode) {
+  function grayCanvas(src, sx, sy, sw, sh, maxEdge, mode, gain) {
     const s = Math.min(2, maxEdge / Math.max(sw, sh));   // 小さい切り出しは最大2倍まで拡大して読む
     const w = Math.max(1, Math.round(sw * s)), h = Math.max(1, Math.round(sh * s));
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d', { willReadFrequently: true });
     x.imageSmoothingQuality = 'high';
     x.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+    if (mode === 'color') return c;   // 加工せず、大きさだけそろえる
     const d = x.getImageData(0, 0, w, h);
     const px = d.data, n = w * h, g = new Float32Array(n);
     for (let i = 0, j = 0; j < n; i += 4, j++) g[j] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
     if (mode === 'edge') {
-      // 薄い彫り込み・刻印の文字向け：周りの明るさとの差（明るい縁も暗い縁も）を黒い線にして、細い文字を読めるようにする
+      // 薄い彫り込み・刻印の文字向け：周りの明るさとの差（明るい縁も暗い縁も）を黒い線にして、細い文字を読めるようにする。
+      // gain が小さいほど弱い強調（泥・汚れのある銘板は弱め、きれいな薄い刻印は強め）
       const bg = blurApprox(g, w, h, 10);
-      for (let j = 0; j < n; j++) g[j] = 255 - Math.min(255, Math.abs(g[j] - bg[j]) * 10);
+      const k = gain || 10;
+      for (let j = 0; j < n; j++) g[j] = 255 - Math.min(255, Math.abs(g[j] - bg[j]) * k);
     } else if (mode === 'local') {
       // 明るさのムラを引いて、文字の凹凸だけを強調する（淡色・刻印の銘板向け）
       const bg = blurApprox(g, w, h, 24);
@@ -199,27 +201,22 @@
     return out;
   }
 
-  // ---------- Tesseract（初回だけ読み込む。オフラインでも使えるよう端末にキャッシュされる） ----------
-  let workerPromise = null;
+  // ---------- 文字認識エンジン（paddle.js: PaddleOCR を端末内で実行。初回だけ部品を読み込み、以後は端末にキャッシュされる） ----------
+  let engineScript = null;
   function loadScript(src) {
     return new Promise((res, rej) => {
       const s = document.createElement('script'); s.src = src; s.onload = res;
-      s.onerror = () => rej(new Error('OCRの部品を読み込めませんでした（初回はインターネット接続が必要です）'));
+      s.onerror = () => rej(new Error('文字認識の部品を読み込めませんでした（初回はインターネット接続が必要です）'));
       document.head.appendChild(s);
     });
   }
-  function getWorker() {
-    if (!workerPromise) {
-      workerPromise = (async () => {
-        if (!window.Tesseract) await loadScript(TESS_DIR + 'tesseract.min.js');
-        const w = await window.Tesseract.createWorker('eng', 1, {
-          workerPath: TESS_DIR + 'worker.min.js', corePath: TESS_DIR, langPath: TESS_DIR, gzip: true, workerBlobURL: false,
-        });
-        await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ ' });
-        return w;
-      })().catch((e) => { workerPromise = null; throw e; });
+  async function getEngine(onStatus) {
+    if (!window.PaddleOCR) {
+      if (!engineScript) engineScript = loadScript(new URL('paddle.js', location.href).href).catch((e) => { engineScript = null; throw e; });
+      await engineScript;
     }
-    return workerPromise;
+    await window.PaddleOCR.load(onStatus);
+    return window.PaddleOCR;
   }
 
   // ---------- 画面 ----------
@@ -305,8 +302,8 @@
     panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
     try {
       const W = bmp.width, H = bmp.height;
-      setStatus('文字認識の準備をしています…（初回は部品の読み込みに少し時間がかかります）');
-      const worker = await getWorker();
+      setStatus('文字認識エンジンを準備しています…（初回のみ・部品の読み込みに少し時間がかかります）');
+      const engine = await getEngine((m) => { if (my === run) setStatus(m); });
       if (my !== run) return;
       let allText = '';
       const absorb = (text) => {
@@ -317,36 +314,36 @@
       };
       let passes;
       if (cropped) {
-        // ガイド枠の中は型式の1〜2行だけなので、1行読み(psm 7)・段落読み(6)・コントラスト強調を組み合わせて読む
+        // ガイド枠の中は型式の1〜2行だけ。加工なし → 汚れ向けの弱い強調 → 薄い刻印向けの強い強調 → コントラストの順に読む
         passes = [
-          { label: '枠内（彫り込み文字向け・1行）', box: [0, 0, W, H], edge: 1400, mode: 'edge', psm: '7' },
-          { label: '枠内（彫り込み文字向け・1語）', box: [0, 0, W, H], edge: 1400, mode: 'edge', psm: '8' },
-          { label: '枠内（1行）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '7' },
-          { label: '枠内（段落）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '6' },
-          { label: '枠内（コントラスト強調・1行）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '7' },
-          { label: '枠内（コントラスト強調・段落）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '6' },
-          { label: '枠内（文字を探す）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '11' },
+          { label: 'そのまま', box: [0, 0, W, H], edge: 1600, mode: 'color' },
+          { label: '細い文字向け（弱）', box: [0, 0, W, H], edge: 1000, mode: 'edge', gain: 4 },
+          { label: '細い文字向け（中）', box: [0, 0, W, H], edge: 1000, mode: 'edge', gain: 6 },
+          { label: '細い文字向け（強）', box: [0, 0, W, H], edge: 1400, mode: 'edge', gain: 10 },
+          { label: 'コントラスト強調', box: [0, 0, W, H], edge: 1400, mode: 'stretch' },
         ];
       } else {
         passes = [
-          { label: '全体', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '11' },
-          { label: '全体（段落）', box: [0, 0, W, H], edge: 2000, mode: 'stretch', psm: '6' },
-          { label: '全体（コントラスト強調）', box: [0, 0, W, H], edge: 2000, mode: 'local', psm: '11' },
+          { label: '全体', box: [0, 0, W, H], edge: 2400, mode: 'color' },
+          { label: '全体（細い文字向け）', box: [0, 0, W, H], edge: 2400, mode: 'edge', gain: 4 },
+          { label: '全体（コントラスト強調）', box: [0, 0, W, H], edge: 2400, mode: 'stretch' },
         ];
         // 写真を重なりのある4分割にして、小さい文字も拡大して読む
         const tw = Math.round(W * 0.62), th = Math.round(H * 0.62);
-        [[0, 0], [W - tw, 0], [0, H - th], [W - tw, H - th]].forEach(([x, y], i) => passes.push({ label: `部分${i + 1}/4`, box: [x, y, tw, th], edge: 2200, mode: 'stretch', psm: '11' }));
+        [[0, 0], [W - tw, 0], [0, H - th], [W - tw, H - th]].forEach(([x, y], i) => {
+          passes.push({ label: `部分${i + 1}/4`, box: [x, y, tw, th], edge: 2000, mode: 'color' });
+          passes.push({ label: `部分${i + 1}/4（細い文字向け）`, box: [x, y, tw, th], edge: 2000, mode: 'edge', gain: 4 });
+        });
       }
       for (let i = 0; i < passes.length; i++) {
         if (my !== run) return;
         const p = passes[i];
         setStatus(`読み取り中 ${i + 1}/${passes.length}（${p.label}）…候補は読めた分から順に表示します`);
-        await worker.setParameters({ tessedit_pageseg_mode: p.psm });
-        const c = grayCanvas(bmp, p.box[0], p.box[1], p.box[2], p.box[3], p.edge, p.mode);
-        const r = await worker.recognize(c);
+        const c = grayCanvas(bmp, p.box[0], p.box[1], p.box[2], p.box[3], p.edge, p.mode, p.gain);
+        const lines = await engine.recognize(c);
         c.width = c.height = 0;
         if (my !== run) return;
-        absorb(r.data.text || '');
+        absorb(lines.map((l) => l.text).join('\n'));
       }
       setStatus(state.tokens.size ? '読み取り完了。読めた文字を直す・タップする、または候補から選んでください。' : '文字を読み取れませんでした。型式の部分を枠いっぱいに撮り直すか、上の欄に型式を入力してください。');
       if (bmp.close) bmp.close();
