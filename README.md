@@ -3,7 +3,7 @@
 P.ELE 2026 建機エレメント総合カタログ（ピーコックエレメント）の、スマホ用の型式・品番検索アプリです。
 ホーム画面に追加でき、一度開けばオフラインでも使えます。
 
-**公開URL：https://danzo42.github.io/peacock-element/**
+**公開URL：https://danzo42.github.io/element-search/**
 （GitHub の `main` ブランチに push すると、`public/` が GitHub Pages に自動で公開されます）
 
 ## 収録状況
