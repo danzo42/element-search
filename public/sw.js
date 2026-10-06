@@ -1,5 +1,5 @@
 // データを更新したら VERSION を上げる（端末側のキャッシュが入れ替わる）
-const VERSION = 'peacock-ele-v64';
+const VERSION = 'peacock-ele-v65';
 const VENDOR = 'peacock-vendor-v1';   // 部品(vendor/)用。部品を差し替えるときだけ番号を上げる
 const ASSETS = [
   './',
@@ -8,6 +8,7 @@ const ASSETS = [
   'app.js',
   'camera.js',
   'paddle.js',
+  'THIRD-PARTY-NOTICES.txt',
   'data.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
