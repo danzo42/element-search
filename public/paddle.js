@@ -15,21 +15,65 @@
     });
   }
 
+  // 部品を読み込みながら進み具合を表示する。通信が止まったままなら打ち切って知らせる
+  // （回線が遅いと計約22MBに数分かかり、表示が変わらないと止まったように見えるため）
+  const STALL_MS = 45000;
+  async function download(name, label, step, say) {
+    const ctl = new AbortController();
+    let timer = setTimeout(() => ctl.abort(), STALL_MS);
+    const kick = () => { clearTimeout(timer); timer = setTimeout(() => ctl.abort(), STALL_MS); };
+    const mb = (n) => (n / 1048576).toFixed(1);
+    try {
+      const res = await fetch(BASE + name, { signal: ctl.signal });
+      if (!res.ok) throw new Error(`${label}を読み込めませんでした（${res.status}）`);
+      const total = Number(res.headers.get('content-length')) || 0;
+      const reader = res.body.getReader();
+      const chunks = [];
+      let got = 0, shown = -1;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        kick();
+        chunks.push(value); got += value.length;
+        const pct = total ? Math.floor(got * 100 / total) : -1;
+        if (pct !== shown) {
+          shown = pct;
+          say(`${label}を読み込んでいます（${step}）… ${mb(got)}${total ? ' / ' + mb(total) : ''}MB` +
+            (total ? `（${pct}%）` : '') + '　※初回のみ。次回からは端末に保存した分を使います');
+        }
+      }
+      const buf = new Uint8Array(got);
+      let o = 0;
+      for (const c of chunks) { buf.set(c, o); o += c.length; }
+      return buf;
+    } catch (e) {
+      if (e && e.name === 'AbortError') {
+        throw new Error(`${label}の読み込みが止まりました。電波の良い場所（Wi-Fiなど）で、もう一度カメラボタンを押してください`);
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function load(onStatus) {
     if (loading) return loading;
     loading = (async () => {
       const say = onStatus || (() => {});
-      say('文字認識エンジンを読み込んでいます…（初回のみ・約20MB）');
+      say('文字認識エンジンを読み込んでいます…（初回のみ・約22MB）');
       if (!window.ort) await loadScript(BASE + 'ort.min.js');
       ortRef = window.ort;
       ortRef.env.wasm.wasmPaths = BASE;
       ortRef.env.wasm.numThreads = 1;        // GitHub Pagesでは複数スレッドが使えないため1本で動かす
       ortRef.env.wasm.proxy = false;
       const opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-      say('文字検出モデルを準備しています…');
-      det = await ortRef.InferenceSession.create(BASE + 'det.onnx', opt);
+      // エンジン本体(wasm)はonnxruntimeが自分で取りに行くので、先に読んで端末のキャッシュに入れておく
+      await download('ort-wasm-simd.wasm', '文字認識エンジン', '1/3', say);
+      const detBytes = await download('det.onnx', '文字検出モデル', '2/3', say);
+      const recBytes = await download('rec.onnx', '文字認識モデル', '3/3', say);
       say('文字認識モデルを準備しています…');
-      rec = await ortRef.InferenceSession.create(BASE + 'rec.onnx', opt);
+      det = await ortRef.InferenceSession.create(detBytes, opt);
+      rec = await ortRef.InferenceSession.create(recBytes, opt);
       const txt = await (await fetch(BASE + 'en_dict.txt')).text();
       dict = txt.split('\n').map((s) => s.replace(/\r$/, '')).filter((s, i, a) => s.length > 0 || i < a.length - 1);
       if (dict[dict.length - 1] === '') dict.pop();
